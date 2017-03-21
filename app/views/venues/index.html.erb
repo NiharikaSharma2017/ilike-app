@@ -1,0 +1,9 @@
+<% provide(:title, 'Venues') %>
+<h1>All venues</h1>
+
+<ul>
+<% @venues['venues']['venue'].each do |venue| %>
+  <li><%= link_to venue['name'], venue_path(venue['id']) %></li>
+<% end %>
+</ul>
+  

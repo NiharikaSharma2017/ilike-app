@@ -1,0 +1,277 @@
+<div class="alert alert-info" role="alert"><strong>Welcome, <%= @user.first_name %></strong>! Here are a few places you might want to check out.</div>
+<div class="row">
+   <div id = "eventlist" class="col-sm-4"></div>
+   
+   <div class="col-sm-8">
+      <div id="over_map">
+         <div class="col-lg-5">
+            <div class="input-group">
+               <input id ="new-loc" type="text" class="form-control" placeholder="Change current location">
+               <span class="input-group-btn">
+                  <button class="btn btn-primary" type="button" onclick="changeAddress()">
+                     Go!
+                  </button>
+                  </span>
+            </div><!-- /input-group -->
+         </div><!-- /.col-lg-6 -->
+      </div>
+
+      <div id="geolocation"></div>
+   </div>
+</div>
+
+<script type="text/javascript">
+
+   var currentDisplayLat;
+   var currentDisplayLng;
+   var map;
+   var markers = new Array();
+   var visible_markers = new Array();
+   var favorite_categories = <%= raw @user.categories.collect { |category| category.category_id } %>
+
+   var oArgs; 
+
+// The function checks if the browser supports Geolocation feature
+function initialize() {
+   
+   if (navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(showCurrentPosition);
+   }else{
+      
+      alert("Whoopie! Your browser is ancient. Geolocation not supported")
+   }
+}
+
+// The function displays the current location of the user on the map
+function showCurrentPosition(position) {
+   
+   currentDisplayLat = position.coords.latitude;
+   currentDisplayLng = position.coords.longitude;
+
+   var myLoc = new google.maps.LatLng(currentDisplayLat,currentDisplayLng);
+   
+   mapProp = {
+         center:myLoc,
+         zoom:12,
+         mapTypeId:google.maps.MapTypeId.ROADMAP
+      };
+   
+   map = new google.maps.Map(document.getElementById("geolocation"),mapProp);
+   
+   var marker = new google.maps.Marker({
+      position: myLoc,
+      // animation:google.maps.Animation.BOUNCE
+   });
+   
+   marker.setIcon('http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld=|0099FF')
+   
+   var infowindow = new google.maps.InfoWindow({
+    content:"You are here"
+   });
+  
+  google.maps.event.addListener(marker, 'click', function() {
+    infowindow.open(map,marker);
+    
+  });
+  markers.push(marker);
+  findEvents(currentDisplayLat, currentDisplayLng);
+} //End Function
+
+// This function searches on eventful for user-preferred category of events
+function findEvents(lat, lng){
+   
+   var lat_string = lat.toString();
+   var lng_string = lng.toString();
+   var where_list = lat_string + "," +lng_string;
+   
+   oArgs = {
+      app_key: "JzrwKVnwSjCSjD9x",
+      category: favorite_categories,
+      where: (where_list), 
+      page_size: 20,
+      sort_order:"popularity",
+      within: 10,
+      date: "This Week",
+      units: "km",
+   };
+   EVDB.API.URL = "https://api.eventful.com/json";
+   EVDB.API.call("/events/search", oArgs, displayEvents);
+}
+
+// This function displays the filtered events on the map
+function displayEvents(filtered_events){
+   console.log(filtered_events);
+   
+   var event_count = filtered_events.events.event.length;
+   
+   for(i = 0; i<event_count; i++){
+      
+      var tempEvent = filtered_events.events.event[i];
+      var eventTitle = "Event title not available";
+      var startTime = "Event start time not available";
+      var stopTime = "Event stop time not available";
+      var address = "Venue address not available";
+      
+      if(tempEvent.title != null){
+        eventTitle = tempEvent.title;
+      } 
+      if(tempEvent.start_time != null){
+        startTime = tempEvent.start_time;
+      } 
+      if(tempEvent.stop_time != null){
+        stopTime = tempEvent.stop_time;
+      } 
+      if(tempEvent.venue_address != null){
+        address = tempEvent.venue_address;
+      }
+
+      
+      displayEventsList(tempEvent);
+
+      var contentString = '<b>' + eventTitle + '</b>' + '<br/>' + '<b> Start Time: </b>' + 
+                                  startTime + '<br/><b>End Time: </b>' + 
+                                  stopTime +'<br/><b>Location: </b>' + 
+                                  address;
+      
+      
+      var eventLoc = new google.maps.LatLng(Number(tempEvent.latitude),Number(tempEvent.longitude));
+      
+      var thisinfowindow = new google.maps.InfoWindow({
+        content:contentString
+        
+      });
+  
+      
+      var marker = new google.maps.Marker({
+        position: eventLoc,
+        title: eventTitle,
+        infowindow: thisinfowindow
+        
+      });
+      
+      google.maps.event.addListener(marker, 'click', function() {
+        
+        this.infowindow.open(map,this);
+        
+      });
+      
+      markers.push(marker);
+    }
+    placeMarkers();
+} // End function
+
+function displayEventsList(tempEvent){
+   
+   var eventsPannel = document.getElementById("eventlist");
+   var eventTitle = "Event title not available";
+   var eventDescription = "No description available";
+   var allDay = 0;
+   var startTime = "Event start time not available";
+   var stopTime = "Event stop time not available";
+   var address = "Venue address not available";
+   var eventID = tempEvent.id;
+   var eventInfoUrl = "/events/" + eventID;
+   var eventInfoEventful = tempEvent.url
+   var imgUrl = "http://lakecitycc.org/wp-content/uploads/2015/01/upcomingevents.jpg";
+   
+      if(tempEvent.description != null){
+        eventDescription = tempEvent.description;
+      }
+      if(tempEvent.title != null){
+        eventTitle = tempEvent.title;
+      } 
+      if(tempEvent.all_day == 1){
+        allDay = tempEvent.all_day;
+      }
+      if(tempEvent.start_time != null){
+        startTime = tempEvent.start_time;
+      } 
+      if(tempEvent.stop_time != null){
+        stopTime = tempEvent.stop_time;
+      } 
+      if(tempEvent.venue_address != null){
+        address = tempEvent.venue_address;
+      }
+      if(tempEvent.hasOwnProperty("image")){
+         if(tempEvent.image != null){
+            if(tempEvent.image.hasOwnProperty("medium")){
+               if(tempEvent.image.medium.url != null){
+                 imgUrl = tempEvent.image.medium.url;
+               }
+            }
+         }
+      }
+      
+      var share_image = '<%= image_tag('facebook-share-button.png', size: "150x60", align: "right") %>';
+      var eventDivString = '<div class = "thumbnail"> <img src =" ' + 
+                           imgUrl + '" alt = "Event Image"> <div class = "caption"> <h4>' + 
+                           eventTitle + '</h4> <div><b> Start Time: </b>' + 
+                           startTime + '<br/><b>End Time: </b>' + 
+                           stopTime +'<br/><b>Location: </b>' + 
+                           address + '</div></div><div class="event-buttons"> <a href="'+
+                           eventInfoUrl +'" align="left" target="_blank" class="btn btn-primary" role="button">View Details</a><a href="http://www.facebook.com/sharer.php?u='+
+                           eventInfoEventful +'">'+ share_image +'</a></div></div>';
+      
+      eventsPannel.innerHTML = eventsPannel.innerHTML + eventDivString;
+} //End function
+
+// This function is to clear all the markers
+function clearMarkers(){
+   for (var i = 0; i < markers.length; i++) {
+     markers[i].setMap(null);
+      
+   }
+   markers = [];
+}
+
+// This function is to place all the markers
+function placeMarkers(){
+   for (var i = 0; i < markers.length; i++) {
+      markers[i].setMap(map);
+   }
+}
+// This function displays the events of a new location given by the user
+function changeAddress(){
+   
+   clearMarkers();
+   document.getElementById("eventlist").innerHTML = "";
+   
+   
+   var newLocation = document.getElementById("new-loc").value;
+   
+   var geocoder = new google.maps.Geocoder();
+   
+   
+   geocoder.geocode( {address: newLocation}, function(results, status){
+      
+      if (status == google.maps.GeocoderStatus.OK){
+         
+         map.setCenter(results[0].geometry.location);
+         
+         var marker = new google.maps.Marker({
+            position: results[0].geometry.location,
+            
+            animation:google.maps.Animation.BOUNCE
+         });
+         
+         findEvents(results[0].geometry.location.lat(), results[0].geometry.location.lng());
+         markers.push(marker);
+         placeMarkers();
+      } else {
+         
+         alert('Geocode was not successful because: ' + status);
+         
+      }
+      
+   })
+   
+   
+   
+} //End Function
+
+
+google.maps.event.addDomListener(window, 'load', initialize);
+
+
+</script>
+
